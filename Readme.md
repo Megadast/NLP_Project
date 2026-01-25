@@ -96,10 +96,7 @@ python main.py
 
 ### Output Sample
 **Final Output**
-![Figure 1 Final Output](https://github.com/Megadast/CSCI4050-machine-learning/blob/main/screenshots/final.png?raw=true)
-
-**Annoted output**
-![Figure 2 Real Annotated](https://github.com/Megadast/CSCI4050-machine-learning/blob/main/screenshots/annoted%20real%20images.jpg?raw=true)
+safsadfsda
 
 ## 7.0 References
 PyTorch Documentation:
