@@ -284,7 +284,7 @@ if __name__ == "__main__":
 
     # load the best model from checkpoints
     best_model_path = checkpoint.best_model_path
-    trained_model = FineTuner.load_from_checkpoint(best_model_path)
+    trained_model = FineTuner.load_from_checkpoint(best_model_path, strict=False)
 
     # trained model test
     trained_model.to(device)
