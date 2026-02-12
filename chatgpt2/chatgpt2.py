@@ -1,34 +1,105 @@
-# Mistral 7b architecure:
+# Chat GPT2 architecure:
 #
-# MistralForCausalLM(
-#   (model): MistralModel(
-#     (embed_tokens): Embedding(32000, 4096)
-#     (layers): ModuleList(
-#       (0-31): MistralDecoderLayer(
-#         (self_attn): MistralSdpaAttention(
-#           (q_proj): Linear4bit(in_features=4096, out_features=4096, bias=False)
-#           (k_proj): Linear4bit(in_features=4096, out_features=1024, bias=False)
-#           (v_proj): Linear4bit(in_features=4096, out_features=1024, bias=False)
-#           (o_proj): Linear4bit(in_features=4096, out_features=4096, bias=False)
-#           (rotary_emb): MistralRotaryEmbedding()
+# ChatGPT2(
+#   (model): PeftModelForCausalLM(
+#     (base_model): LoraModel(
+#       (model): GPT2LMHeadModel(
+#         (transformer): GPT2Model(
+#           (wte): Embedding(50257, 768)
+#           (wpe): Embedding(1024, 768)
+#           (drop): Dropout(p=0.1, inplace=False)
+#           (h): ModuleList(
+#             (0-11): 12 x GPT2Block(
+#               (ln_1): LayerNorm((768,), eps=1e-05, elementwise_affine=True)
+#               (attn): GPT2Attention(
+#                 (c_attn): lora.Linear4bit(
+#                   (base_layer): Linear4bit(in_features=768, out_features=2304, bias=True)
+#                   (lora_dropout): ModuleDict(
+#                     (default): Dropout(p=0.1, inplace=False)
+#                   )
+#                   (lora_A): ModuleDict(
+#                     (default): Linear(in_features=768, out_features=8, bias=False)
+#                   )
+#                   (lora_B): ModuleDict(
+#                     (default): Linear(in_features=8, out_features=2304, bias=False)
+#                   )
+#                   (lora_embedding_A): ParameterDict()
+#                   (lora_embedding_B): ParameterDict()
+#                   (lora_magnitude_vector): ModuleDict()
+#                 )
+#                 (c_proj): lora.Linear4bit(
+#                   (base_layer): Linear4bit(in_features=768, out_features=768, bias=True)
+#                   (lora_dropout): ModuleDict(
+#                     (default): Dropout(p=0.1, inplace=False)
+#                   )
+#                   (lora_A): ModuleDict(
+#                     (default): Linear(in_features=768, out_features=8, bias=False)
+#                   )
+#                   (lora_B): ModuleDict(
+#                     (default): Linear(in_features=8, out_features=768, bias=False)
+#                   )
+#                   (lora_embedding_A): ParameterDict()
+#                   (lora_embedding_B): ParameterDict()
+#                   (lora_magnitude_vector): ModuleDict()
+#                 )
+#                 (attn_dropout): Dropout(p=0.1, inplace=False)
+#                 (resid_dropout): Dropout(p=0.1, inplace=False)
+#               )
+#               (ln_2): LayerNorm((768,), eps=1e-05, elementwise_affine=True)
+#               (mlp): GPT2MLP(
+#                 (c_fc): lora.Linear4bit(
+#                   (base_layer): Linear4bit(in_features=768, out_features=3072, bias=True)
+#                   (lora_dropout): ModuleDict(
+#                     (default): Dropout(p=0.1, inplace=False)
+#                   )
+#                   (lora_A): ModuleDict(
+#                     (default): Linear(in_features=768, out_features=8, bias=False)
+#                   )
+#                   (lora_B): ModuleDict(
+#                     (default): Linear(in_features=8, out_features=3072, bias=False)
+#                   )
+#                   (lora_embedding_A): ParameterDict()
+#                   (lora_embedding_B): ParameterDict()
+#                   (lora_magnitude_vector): ModuleDict()
+#                 )
+#                 (c_proj): lora.Linear4bit(
+#                   (base_layer): Linear4bit(in_features=3072, out_features=768, bias=True)
+#                   (lora_dropout): ModuleDict(
+#                     (default): Dropout(p=0.1, inplace=False)
+#                   )
+#                   (lora_A): ModuleDict(
+#                     (default): Linear(in_features=3072, out_features=8, bias=False)
+#                   )
+#                   (lora_B): ModuleDict(
+#                     (default): Linear(in_features=8, out_features=768, bias=False)
+#                   )
+#                   (lora_embedding_A): ParameterDict()
+#                   (lora_embedding_B): ParameterDict()
+#                   (lora_magnitude_vector): ModuleDict()
+#                 )
+#                 (act): NewGELUActivation()
+#                 (dropout): Dropout(p=0.1, inplace=False)
+#               )
+#             )
+#           )
+#           (ln_f): LayerNorm((768,), eps=1e-05, elementwise_affine=True)
 #         )
-#         (mlp): MistralMLP(
-#           (gate_proj): Linear4bit(in_features=4096, out_features=14336, bias=False)
-#           (up_proj): Linear4bit(in_features=4096, out_features=14336, bias=False)
-#           (down_proj): Linear4bit(in_features=14336, out_features=4096, bias=False)
-#           (act_fn): SiLU()
-#         )
-#         (input_layernorm): MistralRMSNorm((4096,), eps=1e-05)
-#         (post_attention_layernorm): MistralRMSNorm((4096,), eps=1e-05)
+#         (lm_head): Linear(in_features=768, out_features=50257, bias=False)
 #       )
 #     )
-#     (norm): MistralRMSNorm((4096,), eps=1e-05)
 #   )
-#   (lm_head): Linear(in_features=4096, out_features=32000, bias=False)
 # )
 
-import gc
 import os
+import gc
+
+# fetch rocm libraries
+if '/opt/rocm/bin' not in os.environ['PATH']:
+    try:
+        os.environ['PATH'] = '/opt/rocm/bin:' + os.environ['PATH']
+    except:
+        pass
+
 import sys
 import torch
 from datasets import load_dataset
@@ -83,16 +154,12 @@ class FineTuner(LightningModule):
             inference_mode=False,
             r=8,
             lora_alpha=32,
+            fan_in_fan_out=True,  # needed for conv1d
             lora_dropout=0.1,
             target_modules=[
-                "q_proj",
-                "k_proj",
-                "v_proj",
-                "o_proj",
-                "gate_proj",
-                "up_proj",
-                "down_proj",
-                "lm_head",
+                "c_attn",
+                "c_proj", 
+                "c_fc",
             ],
         )
 
@@ -102,21 +169,20 @@ class FineTuner(LightningModule):
         # sanity check
         self.model.print_trainable_parameters()
 
-
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=5e-5, weight_decay=1e-4)
 
-    def forward(self, input_ids, labels=None):
-        return self.model(input_ids=input_ids, labels=labels)
+    def forward(self, input_ids, labels=None, attention_mask=None):
+        return self.model(input_ids=input_ids, labels=labels, attention_mask=attention_mask)
 
     def shared_step(self, mode, batch, batch_index):
-        input_ids, labels = batch
-        pred = self(input_ids=input_ids, labels=labels)
+        input_ids, labels, attention_mask = batch
+        pred = self(input_ids=input_ids, labels=labels, attention_mask=attention_mask)
         loss = pred.loss # auto calculates the loss
-        # perplexity = torch.exp(loss)
+        perplexity = torch.exp(loss)
         self.log(f"{mode}_step_loss", loss, prog_bar=True)
         # log and show perplexity
-        # self.log(f"{mode}_perplexity", perplexity, prog_bar=True)
+        self.log(f"{mode}_perplexity", perplexity, prog_bar=True)
         return loss
 
     def training_step(self, batch, batch_index):
@@ -175,13 +241,14 @@ class DataModule(LightningDataModule):
             max_length=self.max_length,
             return_tensors="pt" # return pytorch tensors
         )
-        return encodings['input_ids'], encodings['input_ids']
+        return encodings['input_ids'], encodings['input_ids'], encodings['attention_mask']
 
     def train_dataloader(self):
         return DataLoader(
             dataset=self.train_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
+            persistent_workers=(self.num_workers > 0),
             collate_fn=self.collate_fn,
         )
 
@@ -190,6 +257,7 @@ class DataModule(LightningDataModule):
             dataset=self.val_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
+            persistent_workers=(self.num_workers > 0),
             collate_fn=self.collate_fn,
         )
 
@@ -198,6 +266,7 @@ class DataModule(LightningDataModule):
             dataset=self.test_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
+            persistent_workers=(self.num_workers > 0),
             collate_fn=self.collate_fn,
         )
 
@@ -205,7 +274,7 @@ class DataModule(LightningDataModule):
 #
 def generate_output_from_input(model, tokenizer, prompt, max_length=60):
     model.eval()
-    input_ids = tokenizer.encode(prompt, return_tensors='pt').to(model.device)
+    input_ids = tokenizer.encode(prompt, return_tensors='pt').to(model.model.device)
 
     output = model.model.generate(
         input_ids,
@@ -247,14 +316,14 @@ if __name__ == "__main__":
     else:
         print('NO HF_TOKEN FOUND: REDUCED RATES')
 
+    #torch.multiprocessing.set_start_method('spawn', force=True)
     torch.set_float32_matmul_precision("medium")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_name = "mistralai/Mistral-7B-v0.1"
-    data_module = DataModule(batch_size=batch_size, model_name=model_name)
+    model_name = "gpt2" # small model for testing
+    data_module = DataModule(batch_size=batch_size, model_name=model_name, num_workers=0)
     untrained_model = FineTuner(model_name=model_name)
 
     # untrained model test
-    untrained_model.to(device)
     untrained_output_text = generate_output_from_input(untrained_model, data_module.tokenizer, input_text)
     trainer = Trainer(logger=False, accelerator="auto")
     print('\nUNTRAINED MODEL:')
@@ -287,7 +356,6 @@ if __name__ == "__main__":
     trained_model = FineTuner.load_from_checkpoint(best_model_path, strict=False)
 
     # trained model test
-    trained_model.to(device)
     trained_output_text = generate_output_from_input(trained_model, data_module.tokenizer, input_text)
     trainer = Trainer(logger=False, accelerator="auto")
     print('\nTRAINED MODEL:')

@@ -1,4 +1,42 @@
+# Mistral 7b architecure:
+#
+# Mistral-7B-v0(
+#   (model): MistralModel(
+#     (embed_tokens): Embedding(32000, 4096)
+#     (layers): ModuleList(
+#       (0-31): MistralDecoderLayer(
+#         (self_attn): MistralSdpaAttention(
+#           (q_proj): Linear4bit(in_features=4096, out_features=4096, bias=False)
+#           (k_proj): Linear4bit(in_features=4096, out_features=1024, bias=False)
+#           (v_proj): Linear4bit(in_features=4096, out_features=1024, bias=False)
+#           (o_proj): Linear4bit(in_features=4096, out_features=4096, bias=False)
+#           (rotary_emb): MistralRotaryEmbedding()
+#         )
+#         (mlp): MistralMLP(
+#           (gate_proj): Linear4bit(in_features=4096, out_features=14336, bias=False)
+#           (up_proj): Linear4bit(in_features=4096, out_features=14336, bias=False)
+#           (down_proj): Linear4bit(in_features=14336, out_features=4096, bias=False)
+#           (act_fn): SiLU()
+#         )
+#         (input_layernorm): MistralRMSNorm((4096,), eps=1e-05)
+#         (post_attention_layernorm): MistralRMSNorm((4096,), eps=1e-05)
+#       )
+#     )
+#     (norm): MistralRMSNorm((4096,), eps=1e-05)
+#   )
+#   (lm_head): Linear(in_features=4096, out_features=32000, bias=False)
+# )
+
+import os
 import gc
+
+# fetch rocm libraries
+if '/opt/rocm/bin' not in os.environ['PATH']:
+    try:
+        os.environ['PATH'] = '/opt/rocm/bin:' + os.environ['PATH']
+    except:
+        pass
+
 import sys
 import torch
 from datasets import load_dataset
@@ -7,7 +45,12 @@ from lightning.pytorch import LightningDataModule, LightningModule
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from lightning.pytorch.loggers import CSVLogger
 from torch.utils.data import DataLoader, TensorDataset
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from peft import LoraConfig, get_peft_model, TaskType
+from huggingface_hub import login
+
+from dotenv import load_dotenv
+load_dotenv()
 
 
 # NOTE: FINE TUNER MODEL
@@ -16,22 +59,71 @@ class FineTuner(LightningModule):
     def __init__(self, model_name):
         super().__init__()
         self.save_hyperparameters()
-        self.model = AutoModelForCausalLM.from_pretrained(model_name)
+
+        # quantization config
+        # store values in 4bit. convert to 16bit during math
+        # nf4 for bell curve lora compression
+        # double quant for scaling factor compression
+        bits_bytes_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type='nf4',
+            bnb_4bit_compute_dytpe=torch.float16,
+            bnb_4bit_double_quant=True,
+        )
+
+        # load model in 4bit
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            quantization_config=bits_bytes_config,
+            device_map='auto',
+            trust_remote_code=True,
+        )
+        # freeze the model so its pre-existing weights are uneffected
+        for param in self.model.parameters():
+            param.requires_grad = False
+
+        # lora config adapter
+        # r = rank (adapter size)
+        # lora_alpha = scaling factor
+        # only train specific layers: target_modules
+        lora_config = LoraConfig(
+            task_type=TaskType.CAUSAL_LM,
+            inference_mode=False,
+            r=8,
+            lora_alpha=32,
+            lora_dropout=0.1,
+            target_modules=[
+                "q_proj",
+                "k_proj",
+                "v_proj",
+                "o_proj",
+                "gate_proj",
+                "up_proj",
+                "down_proj",
+                "lm_head",
+            ],
+        )
+
+        # attach the adapter
+        self.model = get_peft_model(self.model, lora_config)
+
+        # sanity check
+        self.model.print_trainable_parameters()
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=5e-5, weight_decay=1e-4)
 
-    def forward(self, input_ids, labels=None):
-        return self.model(input_ids=input_ids, labels=labels)
+    def forward(self, input_ids, labels=None, attention_mask=None):
+        return self.model(input_ids=input_ids, labels=labels, attention_mask=attention_mask)
 
     def shared_step(self, mode, batch, batch_index):
-        input_ids, labels = batch
-        pred = self(input_ids=input_ids, labels=labels)
+        input_ids, labels, attention_mask = batch
+        pred = self(input_ids=input_ids, labels=labels, attention_mask=attention_mask)
         loss = pred.loss # auto calculates the loss
-        # perplexity = torch.exp(loss)
+        perplexity = torch.exp(loss)
         self.log(f"{mode}_step_loss", loss, prog_bar=True)
         # log and show perplexity
-        # self.log(f"{mode}_perplexity", perplexity, prog_bar=True)
+        self.log(f"{mode}_perplexity", perplexity, prog_bar=True)
         return loss
 
     def training_step(self, batch, batch_index):
@@ -59,6 +151,7 @@ class DataModule(LightningDataModule):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
+            self.tokenizer.padding_side = 'right'
 
     def setup(self, stage=None):
         # load data from hugging face stream
@@ -89,13 +182,14 @@ class DataModule(LightningDataModule):
             max_length=self.max_length,
             return_tensors="pt" # return pytorch tensors
         )
-        return encodings['input_ids'], encodings['input_ids']
+        return encodings['input_ids'], encodings['input_ids'], encodings['attention_mask']
 
     def train_dataloader(self):
         return DataLoader(
             dataset=self.train_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
+            persistent_workers=(self.num_workers > 0),
             collate_fn=self.collate_fn,
         )
 
@@ -104,6 +198,7 @@ class DataModule(LightningDataModule):
             dataset=self.val_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
+            persistent_workers=(self.num_workers > 0),
             collate_fn=self.collate_fn,
         )
 
@@ -112,6 +207,7 @@ class DataModule(LightningDataModule):
             dataset=self.test_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
+            persistent_workers=(self.num_workers > 0),
             collate_fn=self.collate_fn,
         )
 
@@ -119,7 +215,7 @@ class DataModule(LightningDataModule):
 #
 def generate_output_from_input(model, tokenizer, prompt, max_length=60):
     model.eval()
-    input_ids = tokenizer.encode(prompt, return_tensors='pt').to(model.device)
+    input_ids = tokenizer.encode(prompt, return_tensors='pt').to(model.model.device)
 
     output = model.model.generate(
         input_ids,
@@ -154,14 +250,21 @@ if __name__ == "__main__":
         batch_size = 2
         input_text = "The brave warrior"
 
+    # attempt to fetch HF token from dotenv
+    hf_token = os.getenv("HF_TOKEN")
+    if hf_token:
+        login(token=hf_token)
+    else:
+        print('NO HF_TOKEN FOUND: REDUCED RATES')
+
+    #torch.multiprocessing.set_start_method('spawn', force=True)
     torch.set_float32_matmul_precision("medium")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_name = "gpt2" # small model for testing
-    data_module = DataModule(batch_size=batch_size, model_name=model_name)
+    model_name = "mistralai/Mistral-7B-v0.1"
+    data_module = DataModule(batch_size=batch_size, model_name=model_name, num_workers=0)
     untrained_model = FineTuner(model_name=model_name)
 
     # untrained model test
-    untrained_model.to(device)
     untrained_output_text = generate_output_from_input(untrained_model, data_module.tokenizer, input_text)
     trainer = Trainer(logger=False, accelerator="auto")
     print('\nUNTRAINED MODEL:')
@@ -191,10 +294,9 @@ if __name__ == "__main__":
 
     # load the best model from checkpoints
     best_model_path = checkpoint.best_model_path
-    trained_model = FineTuner.load_from_checkpoint(best_model_path)
+    trained_model = FineTuner.load_from_checkpoint(best_model_path, strict=False)
 
     # trained model test
-    trained_model.to(device)
     trained_output_text = generate_output_from_input(trained_model, data_module.tokenizer, input_text)
     trainer = Trainer(logger=False, accelerator="auto")
     print('\nTRAINED MODEL:')
