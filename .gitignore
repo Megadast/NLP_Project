@@ -1,0 +1,6 @@
+.cache
+.dotnet
+.ipython
+.local
+.vscode-server
+amd
