@@ -3,4 +3,7 @@
 .ipython
 .local
 .vscode-server
+.vscode
+.env
 amd
+logs
