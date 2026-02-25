@@ -272,13 +272,14 @@ class DataModule(LightningDataModule):
 
 # NOTE: MODEL USAGE
 #
-def generate_output_from_input(model, tokenizer, prompt, max_length=60):
+def generate_output_from_input(model, tokenizer, prompt, max_length=1000, min_length=100):
     model.eval()
     input_ids = tokenizer.encode(prompt, return_tensors='pt').to(model.model.device)
 
     output = model.model.generate(
         input_ids,
         max_length=max_length,
+        min_length=min_length,
         num_return_sequences=1,
         pad_token_id=tokenizer.eos_token_id,
 
@@ -307,7 +308,7 @@ if __name__ == "__main__":
     else:
         epochs = 1
         batch_size = 2
-        input_text = "The brave warrior"
+        input_text = 'Write a story about a samurai visiting a shrine.'
 
     # attempt to fetch HF token from dotenv
     hf_token = os.getenv("HF_TOKEN")
