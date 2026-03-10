@@ -1,0 +1,9 @@
+# Analysis for NLP project for milestone 4
+
+## Part-of-Speech (POS) Distribution
+
+English and Japanese have fundamentally different syntactic structures. English is a Subject-Verb-Object (SVO) language. It relies heavily on pronouns. Where as Japanese is a Subject-Object-Verb (SOV) language with frequent pronoun drops. Japanese frequently omits pronouns when context allows for inference. This is represented in the Part-of-Speech Distribution. Pronouns are more frequently used in English by our Mistral-7b Fine tuned model than in Japanese by our GPT-NEOX-3.6b Fine tuned model. Inversely since pronouns are less common in Japanese, every other part of speech is more common. This include nouns, verbs, adpositions, and particles. Japanese especially uses more nouns, adpositions, and particles. The English pronoun to noun ratio is 0.2704 whilst the Japanese pronoun to noun ratio is 0.1252 for the fine tuned models. Thus, the results align with the expected differences between the language's structures.
+
+## Cross-Lingual Sentiment Variance
+
+The English and Japanese fine tuned models undergo sentiment analysis of every generated story. This allows the sentiment analysis to capture the emotional weight of the stories. The convey of emotions through story, differs from English to Japanese. This is shown by the difference in variance. The results are grouped in buckets from 0 to 5 stars. English has all of its data within the 4 star bucket, so its variance and standard deviation are 0 (assuming bucket categorization). Where as Japanese has 90% (approximately) of its data within the 4 star bucket, and 10% (approximately) of its data within the 3 star bucket. The results mean that the English fine tuned model is strict and neutral positive. In contrast the Japanese fine tuned model is slightly more willing to exhibit higher emotional variance, or generate lower sentiment narratives.
