@@ -30,15 +30,16 @@ print(output["generated_text"])
  
 
 
+
 This model was trained with SFT.
 
 ### Framework versions
 
-- TRL: 0.28.0
-- Transformers: 4.57.6
-- Pytorch: 2.3.0+cu121
-- Datasets: 4.5.0
-- Tokenizers: 0.22.1
+- TRL: 0.29.0
+- Transformers: 5.3.0
+- Pytorch: 2.9.1+rocm7.2.0.lw.git7e1940d4
+- Datasets: 4.6.1
+- Tokenizers: 0.22.2
 
 ## Citations
 
@@ -49,7 +50,7 @@ Cite TRL as:
 ```bibtex
 @software{vonwerra2020trl,
   title   = {{TRL: Transformers Reinforcement Learning}},
-  author  = {von Werra, Leandro and Belkada, Younes and Tunstall, Lewis and Beeching, Edward and Thrush, Tristan and Lambert, Nathan and Huang, Shengyi and Rasul, Kashif and Gallouﾃｩdec, Quentin},
+  author  = {von Werra, Leandro and Belkada, Younes and Tunstall, Lewis and Beeching, Edward and Thrush, Tristan and Lambert, Nathan and Huang, Shengyi and Rasul, Kashif and Gallouédec, Quentin},
   license = {Apache-2.0},
   url     = {https://github.com/huggingface/trl},
   year    = {2020}
